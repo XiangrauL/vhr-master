@@ -149,6 +149,7 @@ export default {
 
 .button-group {
   display: flex;
+  margin-left: 200px;
 }
 
 .table-button {
