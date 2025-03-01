@@ -32,7 +32,7 @@
           <td>{{ item.column3 }}</td>
           <td>{{ item.column4 }}</td>
           <td>{{ item.column5 }}</td>
-          <!-- 为最后一个单元格添加一个特定的类 -->
+          <!-- 为最后一列单元格添加一个特定的类 -->
           <td class="highlight-text">{{ item.column6 }}</td>
         </tr>
       </tbody>
