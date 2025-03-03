@@ -16,6 +16,16 @@
       <input type="text" v-model="searchQuery" placeholder="搜索位置" />
       <button @click="searchLocation">搜索</button>
     </div>
+    <div class="style-switcher">
+      <select v-model="selectedStyle" @change="changeMapStyle" class="style-select">
+        <option value="mapbox://styles/mapbox/streets-v11">街道</option>
+        <option value="mapbox://styles/mapbox/outdoors-v11">户外</option>
+        <option value="mapbox://styles/mapbox/light-v10">亮色</option>
+        <option value="mapbox://styles/mapbox/dark-v10">暗色</option>
+        <option value="mapbox://styles/mapbox/satellite-v9">卫星</option>
+        <option value="mapbox://styles/mapbox/satellite-streets-v11">卫星街道</option>
+      </select>
+    </div>
   </div>
 </template>
 
@@ -33,7 +43,8 @@ export default {
       longitude: 0,
       latitude: 0,
       searchQuery: '', // 添加搜索查询数据
-      map: null // 添加 map 属性
+      map: null, // 添加 map 属性
+      selectedStyle: 'mapbox://styles/mapbox/light-v10'
     };
   },
   mounted() {
@@ -166,6 +177,50 @@ export default {
         .catch(error => {
           console.error('Error:', error);
         });
+    },
+    changeMapStyle() {
+      // 切换地图样式
+      this.map.setStyle(this.selectedStyle);
+      
+      // 在样式加载完成后重新添加3D建筑图层
+      this.map.once('style.load', () => {
+        // 获取当前地图的所有图层
+        const layers = this.map.getStyle().layers;
+        let labelLayerId;
+        // 查找标签图层
+        for (const layer of layers) {
+          if (layer.type === 'symbol' && layer.layout['text-field']) {
+            labelLayerId = layer.id;
+            break;
+          }
+        }
+        
+        // 重新添加3D建筑图层
+        if (!this.map.getLayer('3d-buildings')) {
+          this.map.addLayer({
+            'id': '3d-buildings',
+            'source': 'composite',
+            'source-layer': 'building',
+            'filter': ['==', 'extrude', 'true'],
+            'type': 'fill-extrusion',
+            'minzoom': 15,
+            'paint': {
+              'fill-extrusion-color': '#aaa',
+              'fill-extrusion-height': [
+                'interpolate', ['linear'], ['zoom'],
+                15, 0,
+                15.05, ['get', 'height']
+              ],
+              'fill-extrusion-base': [
+                'interpolate', ['linear'], ['zoom'],
+                15, 0,
+                15.05, ['get', 'min_height']
+              ],
+              'fill-extrusion-opacity': 0.6
+            }
+          }, labelLayerId);
+        }
+      });
     }
   }
 }
@@ -215,5 +270,34 @@ export default {
 }
 .tools button:active {
   background-color: #004085;
+}
+.style-switcher {
+  position: absolute;
+  top: 120px;
+  right: 80px;
+  z-index: 1000;
+}
+
+.style-select {
+  padding: 8px 12px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(5px);
+  color: #333;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.style-select:hover {
+  background: rgba(255, 255, 255, 1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.style-select option {
+  background: white;
+  color: #333;
 }
 </style>

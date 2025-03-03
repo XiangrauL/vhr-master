@@ -1,246 +1,536 @@
 <template>
-  <div>
-    <div id="mapCon" />
-    <div class="selectInfo">
-      <p>经度: {{ longitude }}</p>
-      <p>纬度: {{ latitude }}</p>
+  <div class="map-container">
+    <div id="map"></div>
+    <div class="coordinates-panel">
+      <div class="coordinate-item">
+        <span class="label">经度:</span>
+        <span class="value">{{ longitude }}</span>
+      </div>
+      <div class="coordinate-item">
+        <span class="label">纬度:</span>
+        <span class="value">{{ latitude }}</span>
+      </div>
     </div>
-    <div class="tools">
-      <button @click="measureDistance">测量距离</button>
-      <button @click="measureArea">测量面积</button>
-      <button @click="drawPoint">绘制点</button>
-      <button @click="drawLine">绘制线</button>
-      <button @click="drawPolygon">绘制面</button>
-      <button @click="addMarker">添加地标</button>
-      <button @click="clearDrawings">清空标绘</button>
-      <input type="text" v-model="searchQuery" placeholder="搜索位置" />
-      <button @click="searchLocation">搜索</button>
+    <button class="reset-rotation-btn" @click="resetRotation" title="回正方向">
+      ⇱
+    </button>
+    <div class="draw-tools">
+      <button @click="addInteraction('Point')" title="绘制点">
+        <span>⚪</span>
+      </button>
+      <button @click="addInteraction('LineString')" title="绘制线">
+        <span>／</span>
+      </button>
+      <button @click="addInteraction('Polygon')" title="绘制面">
+        <span>▱</span>
+      </button>
+      <button @click="clearDrawings" title="清除">
+        <span>🗑</span>
+      </button>
+    </div>
+    <div class="mouse-tooltip" v-show="showTooltip" :style="tooltipStyle">
+      {{ tooltipText }}
+    </div>
+    <div class="search-box">
+      <input 
+        type="text" 
+        v-model="searchQuery" 
+        placeholder="搜索位置" 
+        @keyup.enter="searchLocation"
+      />
+      <button @click="searchLocation">
+        🔍
+      </button>
     </div>
   </div>
 </template>
-
+ 
 <script>
-// 导入 Mapbox 的 JavaScript 库
-//import mapboxgl from '../mapbox'
-//在index.html中通过CDN引入Mapbox的CSS和JavaScript文件
-//在组件中直接使用全局变量mapboxgl，无需再导入
-//import mapboxgl from '../mapbox'
-//需要开梯子才能正常显示地图
-import MapboxDraw from '@mapbox/mapbox-gl-draw'; // 导入 MapboxDraw
-export default {
-  name: 'Map2D',
-  data() {
-    return {
-      longitude: 0,
-      latitude: 0,
-      searchQuery: '', // 添加搜索查询数据
-      map: null, // 添加 map 属性
-      currentDraw: null
-    };
-  },
-  mounted() {
-    //确保 mapboxgl 已定义
-    if (typeof mapboxgl === 'undefined') {
-      console.error('mapboxgl is not defined');
-      return;
-    }
-    mapboxgl.accessToken = "pk.eyJ1IjoiamllZ2lzZXJnZyIsImEiOiJjanExcmJjMTYxMGlxM3hueG9lZjQ4eng5In0.F4Ia4OCMj8HZV8scGQvSfQ";
-    this.map = new mapboxgl.Map({
-      container: 'mapCon',
-      style: 'mapbox://styles/mapbox/satellite-streets-v11',
-      //不同的地图风格
-      //mapbox://styles/mapbox/streets-v11
-      //mapbox://styles/mapbox/outdoors-v11
-      //mapbox://styles/mapbox/light-v10
-      //mapbox://styles/mapbox/dark-v10
-      //mapbox://styles/mapbox/satellite-v9
-      //mapbox://styles/mapbox/satellite-streets-v11
-      //mapbox://styles/mapbox/navigation-preview-day-v4
-      //mapbox://styles/mapbox/navigation-preview-night-v4
-      //mapbox://styles/mapbox/navigation-guidance-day-v4
-      //mapbox://styles/mapbox/navigation-guidance-night-v4
-      center: [121.8843, 38.98], // 修改后的经纬度
-      zoom: 12,// 修改后的缩放级别
-      pitch: 45, // 设置地图的倾斜角度
-      bearing: -17.6, // 设置地图的旋转角度
-      antialias: true // 设置抗锯齿，使地图渲染更平滑 
-    });
-
-    // 添加地图浏览、拖搜缩放、视角切换功能
-    this.map.addControl(new mapboxgl.NavigationControl());
-
-    // 添加坐标显示功能
-    this.map.on('mousemove', (e) => {
-      this.longitude = e.lngLat.lng.toFixed(4);
-      this.latitude = e.lngLat.lat.toFixed(4);
-    });
-
-    // 添加光照模拟功能
-    this.map.on('style.load', () => {
-      this.map.setLight({
-        anchor: 'viewport',
-        color: 'white',
-        intensity: 0.4
-      });
-    });
-
-    console.log(this.map);
-  },
-  methods: {
-    measureDistance() {
-      // 创建Mapbox Draw实例，用于绘制线条
-      const draw = new MapboxDraw({
-        displayControlsDefault: false, // 不显示默认控件
-        controls: {
-          line_string: true, // 只显示线条绘制控件
-          trash: true // 显示垃圾桶控件以删除绘制
+  import Map from "ol/Map"
+  import {Tile as TileLayer, Vector as VectorLayer} from "ol/layer"
+  import {OSM, Vector as VectorSource} from "ol/source"
+  import View from "ol/View"
+  import {fromLonLat, transform} from "ol/proj"
+  import {Draw, Modify, Snap} from 'ol/interaction'
+  import {Circle as CircleStyle, Fill, Stroke, Style, Text} from 'ol/style'
+  import {getLength, getArea} from 'ol/sphere'
+  import Feature from 'ol/Feature'
+  import {LineString, Polygon} from 'ol/geom'
+  // 移除 Vuex 相关导入
+ 
+  export default {
+    name: 'Map2D',
+    data(){
+      return {
+        map: {},
+        longitude: '0.0000',
+        latitude: '0.0000',
+        source: null,
+        vector: null,
+        draw: null,
+        snap: null,
+        showTooltip: false,
+        tooltipText: '',
+        tooltipStyle: {
+          left: '0px',
+          top: '0px'
         },
-        styles: [{
-          // 设置绘制线条的样式
-          id: 'gl-draw-line',
-          type: 'line',
-          filter: ['all', ['==', '$type', 'LineString']],
-          layout: {
-            'line-cap': 'round',
-            'line-join': 'round'
-          },
-          paint: {
-            'line-color': '#D20C0C',
-            'line-width': 2
-          }
-        }]
-      });
-
-      // 如果已有Draw控件，则移除它
-      if (this.currentDraw) {
-        this.map.removeControl(this.currentDraw);
-        // 可选：清除先前的绘制（如果需要）
-        // this.map.setPaintProperty('gl-draw-line', 'line-opacity', 0);
-        // setTimeout(() => this.map.removeLayer('gl-draw-line'), 1000); // 延迟移除层以避免闪烁
+        searchQuery: '',
+        // 添加原来在 Vuex 中的状态
+        viewState: {
+          center: [121.8471, 38.9961],
+          zoom: 12,
+          rotation: 0
+        },
+        isActive: true  // 替代原来的 activeMap 判断
       }
-
-      // 保存新的Draw控件实例
-      this.currentDraw = draw;
-      // 将Draw控件添加到地图上
-      this.map.addControl(draw);
-
-      // 监听绘制完成事件
-      this.map.on('draw.create', (e) => {
-        const data = draw.getAll(); // 获取所有绘制的数据
-        if (data.features.length > 0) {
-          const line = data.features[0]; // 获取第一个（也是唯一一个）LineString特征
-          const distance = turf.length(line, { units: 'kilometers' }); // 直接以公里为单位计算长度（如果turf.js版本支持）
-          // 注意：如果turf.length不支持直接指定单位，则需要手动转换：const distanceInMeters = turf.length(line); const distanceInKilometers = distanceInMeters / 1000;
-          alert(`测量的距离为: ${distance.toFixed(2)} 公里`);
-          
-          // 可选：清除绘制以准备下一次测量
-          // draw.deleteAll();
-        }
-      });
     },
-    measureArea() {
-      // 实现面积测量功能
-    },
-    drawPoint() {
-      // 实现绘制点功能
-      // 创建一个新的 Draw 实例
-      const draw = new MapboxDraw({
-        displayControlsDefault: false,
-        controls: {
-          point: true,
-          trash: true
-        }
-      });
-      this.map.addControl(draw);
-      console.log(this.map);
-      // 监听绘制完成事件
-      this.map.on('draw.create', (e) => {
-        const data = draw.getAll();
-        if (data.features.length > 0) {
-          const point = data.features[0];
-          alert(`绘制的点坐标为: 经度 ${point.geometry.coordinates[0].toFixed(4)}, 纬度 ${point.geometry.coordinates[1].toFixed(4)}`);
-        }
-      });
-    },
-    drawLine() {
-      // 实现绘制线功能
-    },
-    drawPolygon() {
-      // 实现绘制面功能
-    },
-    addMarker() {
-      // 实现添加地标功能
-    },
-    clearDrawings() {
-      // 实现清空标绘功能
-    },
-    searchLocation() {
-      // 使用 Mapbox Geocoding API 进行位置搜索
-      const geocodingUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${this.searchQuery}.json?access_token=${mapboxgl.accessToken}`;
-      fetch(geocodingUrl)
-        .then(response => response.json())
-        .then(data => {
-          if (data.features && data.features.length > 0) {
-            const [lng, lat] = data.features[0].center;
-            this.longitude = lng.toFixed(4);
-            this.latitude = lat.toFixed(4);
-            this.map.flyTo({ center: [lng, lat], zoom: 14 });
-          } else {
-            alert('未找到该位置');
-          }
-        })
-        .catch(error => {
-          console.error('Error:', error);
+    methods:{
+      // 移除 Vuex actions 映射
+      updateViewState(newState) {
+        this.viewState = { ...this.viewState, ...newState };
+      },
+      setActive(status) {
+        this.isActive = status;
+      },
+      
+      initialMap(){
+        let that = this;
+        
+        // 创建矢量数据源
+        this.source = new VectorSource();
+        
+        // 创建矢量图层
+        this.vector = new VectorLayer({
+          source: this.source,
+          style: new Style({
+            fill: new Fill({
+              color: 'rgba(255, 255, 255, 0.2)'
+            }),
+            stroke: new Stroke({
+              color: '#ffcc33',
+              width: 2
+            }),
+            image: new CircleStyle({
+              radius: 7,
+              fill: new Fill({
+                color: '#ffcc33'
+              })
+            })
+          })
         });
+
+        that.map = new Map({
+          target:"map", //挂载到id为map的div容器上
+          layers:[
+            new TileLayer({
+              source: new OSM()	//OSM地图
+            }),
+            this.vector  // 添加矢量图层
+          ],
+          //设置视图，包括中心点，坐标系，默认缩放级别，最大、最小缩放级别
+          view: new View({
+            projection:'EPSG:3857',	//坐标系
+            center: fromLonLat([121.8471,38.9961]),	//中心点
+            zoom: 12,	  //默认缩放级别
+            minZoom:1,	//最小缩放级别
+            maxZoom: 18,	//最大缩放级别
+            rotation: 0.2 // OpenLayers 使用 rotation 而不是 bearing
+          })
+        });
+
+        // 添加鼠标移动监听器更新坐标
+        that.map.on('pointermove', (evt) => {
+          const coords = transform(evt.coordinate, 'EPSG:3857', 'EPSG:4326');
+          that.longitude = coords[0].toFixed(4);
+          that.latitude = coords[1].toFixed(4);
+        });
+
+        // 添加视图变化监听
+        this.map.on('moveend', () => {
+          if (!this.isActive) {
+            return;
+          }
+          const view = this.map.getView();
+          const center = transform(view.getCenter(), 'EPSG:3857', 'EPSG:4326');
+          const zoom = view.getZoom();
+          const rotation = view.getRotation();
+          
+          this.updateViewState({
+            center,
+            zoom,
+            rotation
+          });
+        });
+
+        // 监听交互开始
+        this.map.on('movestart', () => {
+          this.setActive(true);
+        });
+      },
+      
+      addInteraction(type) {
+        // 移除现有的绘制交互
+        if (this.draw) {
+          this.map.removeInteraction(this.draw);
+        }
+        if (this.snap) {
+          this.map.removeInteraction(this.snap);
+        }
+        
+        // 添加新的绘制交互
+        this.draw = new Draw({
+          source: this.source,
+          type: type
+        });
+
+        // 设置初始提示文本
+        const tooltipMessages = {
+          'Point': '单击添加点',
+          'LineString': '单击开始绘制线条，双击结束',
+          'Polygon': '单击开始绘制多边形，双击结束'
+        };
+        this.tooltipText = tooltipMessages[type];
+        this.showTooltip = true;
+
+        // 监听鼠标移动更新提示位置
+        this.map.on('pointermove', this.updateTooltipPosition);
+
+        // 监听绘制过程
+        this.draw.on('drawstart', () => {
+          if (type === 'LineString') {
+            this.tooltipText = '单击继续绘制，双击结束';
+          } else if (type === 'Polygon') {
+            this.tooltipText = '单击继续绘制，双击闭合';
+          }
+        });
+
+        // 监听绘制完成
+        this.draw.on('drawend', (evt) => {
+          this.showTooltip = false;
+          this.map.un('pointermove', this.updateTooltipPosition);
+          
+          const feature = evt.feature;
+          const geometry = feature.getGeometry();
+          
+          if (type === 'LineString') {
+            const length = getLength(geometry);
+            const lengthKm = (length / 1000).toFixed(2);
+            
+            feature.setStyle(new Style({
+              stroke: new Stroke({
+                color: '#ffcc33',
+                width: 2
+              }),
+              text: new Text({
+                text: `距离: ${lengthKm} 公里`,
+                fill: new Fill({color: '#000'}),
+                stroke: new Stroke({color: '#fff', width: 2}),
+                offsetY: -10,
+                font: '14px Microsoft YaHei'
+              })
+            }));
+          } 
+          else if (type === 'Polygon') {
+            const area = getArea(geometry);
+            const areaKm = (area / 1000000).toFixed(2);
+            
+            feature.setStyle(new Style({
+              fill: new Fill({
+                color: 'rgba(255, 255, 255, 0.2)'
+              }),
+              stroke: new Stroke({
+                color: '#ffcc33',
+                width: 2
+              }),
+              text: new Text({
+                text: `面积: ${areaKm} 平方公里`,
+                fill: new Fill({color: '#000'}),
+                stroke: new Stroke({color: '#fff', width: 2}),
+                offsetY: -10,
+                font: '14px Microsoft YaHei'
+              })
+            }));
+          }
+        });
+
+        this.map.addInteraction(this.draw);
+        
+        // 添加捕捉交互
+        this.snap = new Snap({source: this.source});
+        this.map.addInteraction(this.snap);
+      },
+      
+      updateTooltipPosition(evt) {
+        const pixel = evt.pixel;
+        this.tooltipStyle = {
+          left: (pixel[0] + 250) + 'px', // 提示信息距离鼠标的距离从10px改为250px
+          top: (pixel[1] + 100) + 'px'   // 从10px改为5px
+        };
+      },
+
+      clearDrawings() {
+        // 清除所有绘制的图形
+        this.source.clear();
+        
+        // 移除绘制交互
+        if (this.draw) {
+          this.map.removeInteraction(this.draw);
+          this.draw = null;
+        }
+        
+        // 移除捕捉交互
+        if (this.snap) {
+          this.map.removeInteraction(this.snap);
+          this.snap = null;
+        }
+        
+        // 隐藏提示框
+        this.showTooltip = false;
+        
+        // 移除鼠标移动监听
+        this.map.un('pointermove', this.updateTooltipPosition);
+      },
+      
+      resetRotation() {
+        const view = this.map.getView();
+        view.setRotation(0);
+      },
+
+      searchLocation() {
+        if (!this.searchQuery) return;
+        
+        // 使用 OpenStreetMap Nominatim API 进行地理编码搜索
+        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(this.searchQuery)}`)
+          .then(response => response.json())
+          .then(data => {
+            if (data && data.length > 0) {
+              const location = data[0];
+              const center = [parseFloat(location.lon), parseFloat(location.lat)];
+              
+              // 转换坐标为EPSG:3857
+              const transformedCenter = transform(center, 'EPSG:4326', 'EPSG:3857');
+              
+              // 移动到搜索位置
+              this.map.getView().animate({
+                center: transformedCenter,
+                zoom: 14,
+                duration: 1000
+              });
+            } else {
+              alert('未找到该位置');
+            }
+          })
+          .catch(error => {
+            console.error('搜索错误:', error);
+            alert('搜索失败，请稍后重试');
+          });
+      },
+
+      // 监听Vuex状态变化，同步地图视图
+      updateMapView() {
+        if (this.isActive) return;
+        
+        const view = this.map.getView();
+        const center = transform(this.viewState.center, 'EPSG:4326', 'EPSG:3857');
+        
+        view.animate({
+          center: center,
+          zoom: this.viewState.zoom,
+          rotation: this.viewState.rotation,
+          duration: 100
+        });
+      }
+    },
+    mounted() {
+      this.initialMap()
+    },
+    beforeDestroy() {
+      // 组件销毁前清理交互
+      if (this.draw) {
+        this.map.removeInteraction(this.draw);
+      }
+      if (this.snap) {
+        this.map.removeInteraction(this.snap);
+      }
+    },
+    watch: {
+      viewState: {
+        deep: true,
+        handler: 'updateMapView'
+      }
     }
   }
-}
 </script>
-
+ 
 <style scoped>
-#mapCon {
-  height: calc(100vh - 85px);
+.map-container {
+  position: relative;
   width: 100%;
+  height: 100vh;
 }
-.selectInfo {
-  position: absolute;
-  top: 105px; /* 距离top的距离 */
-  left: 221px; /* 距离左边的距离 */
-  background: rgba(255, 255, 255, 0.8);
-  padding: 10px;
-  border-radius: 10px;
+
+#map {
+  width: 100%;
+  height: 100%;
 }
-.tools {
+
+.coordinates-panel {
   position: absolute;
-  top: 100px;
-  left: 340px;
-  background: transparent; /* 设置背景为透明 */
-  padding: 10px;
-  border-radius: 5px;
+  top: 20px;
+  left: 20px;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 12px 16px;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  z-index: 1000;
+}
+
+.coordinate-item {
+  margin: 4px 0;
   display: flex;
-  flex-wrap: wrap;
-  /* justify-content: flex-end; 将内容对齐到最右边 */
+  align-items: center;
 }
-.tools input {
-  margin: 5px;
-  padding: 10px;
-  border: 1px solid #ccc;
-  border-radius: 5px;
+
+.label {
+  font-size: 14px;
+  color: #666;
+  font-weight: bold;
+  margin-right: 8px;
+  min-width: 40px;
 }
-.tools button {
-  margin: 5px;
-  padding: 10px 15px;
-  background-color: #007bff;
+
+.value {
+  font-family: 'Consolas', monospace;
+  font-size: 14px;
+  color: #333;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.reset-rotation-btn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.9);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(5px);
+  transition: all 0.3s ease;
+  z-index: 1000;
+}
+
+.reset-rotation-btn:hover {
+  background: rgba(255, 255, 255, 1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+}
+
+.reset-rotation-btn:active {
+  transform: translateY(0);
+}
+
+.draw-tools {
+  position: absolute;
+  top: 20px;
+  left: 200px;
+  display: flex;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 8px;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(5px);
+  z-index: 1000;
+}
+
+.draw-tools button {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: #666;
+  transition: all 0.3s ease;
+}
+
+.draw-tools button:hover {
+  background: #f0f0f0;
+  transform: translateY(-1px);
+}
+
+.draw-tools button:active {
+  transform: translateY(0);
+}
+
+.mouse-tooltip {
+  position: fixed;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 4px 8px;          /* 减小内边距 */
+  border-radius: 4px;
+  font-size: 12px;           /* 稍微减小字体 */
+  pointer-events: none;
+  z-index: 1001;
+  font-family: 'Microsoft YaHei', sans-serif;
+  white-space: nowrap;
+  transform: translate(0, -50%); /* 垂直居中对齐 */
+}
+
+.search-box {
+  position: absolute;
+  top: 15px;
+  right: 70px;
+  display: flex;
+  gap: 8px;
+  /*background: rgba(255, 255, 255, 0.9);*/
+  padding: 8px;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(5px);
+  z-index: 1000;
+}
+
+.search-box input {
+  padding: 8px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  font-size: 14px;
+  width: 200px;
+  outline: none;
+}
+
+.search-box input:focus {
+  border-color: #007bff;
+}
+
+.search-box button {
+  padding: 8px 16px;
+  background: #007bff;
   color: white;
   border: none;
-  border-radius: 5px;
+  border-radius: 4px;
   cursor: pointer;
   transition: background-color 0.3s;
 }
-.tools button:hover {
-  background-color: #0056b3;
-}
-.tools button:active {
-  background-color: #004085;
+
+.search-box button:hover {
+  background: #0056b3;
 }
 </style>
