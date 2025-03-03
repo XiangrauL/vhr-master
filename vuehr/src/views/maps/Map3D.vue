@@ -13,6 +13,8 @@
       <button @click="drawPolygon">绘制面</button>
       <button @click="addMarker">添加地标</button>
       <button @click="clearDrawings">清空标绘</button>
+      <input type="text" v-model="searchQuery" placeholder="搜索位置" />
+      <button @click="searchLocation">搜索</button>
     </div>
   </div>
 </template>
@@ -29,12 +31,14 @@ export default {
   data() {
     return {
       longitude: 0,
-      latitude: 0
+      latitude: 0,
+      searchQuery: '', // 添加搜索查询数据
+      map: null // 添加 map 属性
     };
   },
   mounted() {
     mapboxgl.accessToken = "pk.eyJ1IjoiamllZ2lzZXJnZyIsImEiOiJjanExcmJjMTYxMGlxM3hueG9lZjQ4eng5In0.F4Ia4OCMj8HZV8scGQvSfQ";
-    var map = new mapboxgl.Map({
+    this.map = new mapboxgl.Map({
       container: 'mapCon',
       style: 'mapbox://styles/mapbox/light-v10',
       //不同的地图风格
@@ -56,17 +60,17 @@ export default {
     });
 
     // 添加地图浏览、拖搜缩放、视角切换功能
-    map.addControl(new mapboxgl.NavigationControl());
+    this.map.addControl(new mapboxgl.NavigationControl());
 
     // 添加坐标显示功能
-    map.on('mousemove', (e) => {
+    this.map.on('mousemove', (e) => {
       this.longitude = e.lngLat.lng.toFixed(4);
       this.latitude = e.lngLat.lat.toFixed(4);
     });
 
     // 添加光照模拟功能
-    map.on('style.load', () => {
-      map.setLight({
+    this.map.on('style.load', () => {
+      this.map.setLight({
         anchor: 'viewport',
         color: 'white',
         intensity: 0.4
@@ -74,9 +78,9 @@ export default {
     });
 
     // 在地图加载完成后执行的函数
-    map.on('load', () => {
+    this.map.on('load', () => {
       // 获取当前地图的所有图层
-      const layers = map.getStyle().layers
+      const layers = this.map.getStyle().layers
       let labelLayerId // 用于存储标签图层的 ID 
       // 遍历所有图层，查找类型为 'symbol' 并且有 'textfield' 属性的图层
       for (var i = 0; i < layers.length; i++) {
@@ -87,7 +91,7 @@ export default {
       }
 
       // 在地图中添加一个新的 3D 建筑图层
-      map.addLayer({
+      this.map.addLayer({
         'id': '3d-buildings', // 图层的 ID 
         'source': 'composite', // 图层的数据源
         'source-layer': 'building', // 数据源中的图层名称
@@ -120,7 +124,7 @@ export default {
       }, labelLayerId) // 将新图层添加到找到的标签图层之上
     });
 
-    console.log(map);
+    console.log(this.map);
   },
   methods: {
     measureDistance() {
@@ -143,6 +147,25 @@ export default {
     },
     clearDrawings() {
       // 实现清空标绘功能
+    },
+    searchLocation() {
+      // 使用 Mapbox Geocoding API 进行位置搜索
+      const geocodingUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${this.searchQuery}.json?access_token=${mapboxgl.accessToken}`;
+      fetch(geocodingUrl)
+        .then(response => response.json())
+        .then(data => {
+          if (data.features && data.features.length > 0) {
+            const [lng, lat] = data.features[0].center;
+            this.longitude = lng.toFixed(4);
+            this.latitude = lat.toFixed(4);
+            this.map.flyTo({ center: [lng, lat], zoom: 14 });
+          } else {
+            alert('未找到该位置');
+          }
+        })
+        .catch(error => {
+          console.error('Error:', error);
+        });
     }
   }
 }
@@ -164,9 +187,17 @@ export default {
 .tools {
   position: absolute;
   top: 100px;
-  left: 600px;
+  left: 340px;
   background: transparent; /* 设置背景为透明 */
   padding: 10px;
+  border-radius: 5px;
+  display: flex;
+  flex-wrap: wrap;
+}
+.tools input {
+  margin: 5px;
+  padding: 10px;
+  border: 1px solid #ccc;
   border-radius: 5px;
 }
 .tools button {
