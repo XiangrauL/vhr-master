@@ -2,6 +2,7 @@ package org.javaboy.vhr.service;
 
 import org.javaboy.vhr.mapper.MenuMapper;
 import org.javaboy.vhr.mapper.MenuRoleMapper;
+import org.javaboy.vhr.model.EmrData;
 import org.javaboy.vhr.model.Hr;
 import org.javaboy.vhr.model.Menu;
 import org.javaboy.vhr.model.MenuRole;

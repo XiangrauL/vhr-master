@@ -2,11 +2,61 @@
   <div class="ptl-dvc">
     <h2 class="title">应急物资清单</h2>
     <div class="controls">
-      <div class="search-box">
-        <input type="text" v-model="searchQuery" placeholder="搜索..." class="search-input" />
-        <button @click="performSearch" class="search-button">搜索</button>
+      <div style="display: flex;justify-content: space-between">
+        <div>
+          <el-input
+            placeholder="请输入物资名称进行搜索..."
+            prefix-icon="el-icon-search"
+            clearable
+            @clear="initEmps"
+            style="width: 350px;margin-right: 10px"
+            v-model="keyword"
+            @keydown.enter.native="initEmps"
+            :disabled="showAdvanceSearchView">
+          </el-input>
+          <el-button icon="el-icon-search" type="primary" @click="initEmps" :disabled="showAdvanceSearchView">
+            搜索
+          </el-button>
+          <el-button type="primary" @click="showAdvanceSearchView = !showAdvanceSearchView">
+            <i :class="showAdvanceSearchView?'fa fa-angle-double-up':'fa fa-angle-double-down'"
+               aria-hidden="true"></i>
+            高级搜索
+          </el-button>
+        </div>
       </div>
     </div>
+    
+    <!-- 添加高级搜索面板 -->
+    <transition name="slide-fade">
+      <div v-show="showAdvanceSearchView"
+           style="border: 1px solid #409eff;border-radius: 5px;box-sizing: border-box;padding: 5px;margin: 10px 0px;">
+        <el-row>
+          <el-col :span="6">
+            物资名称:
+            <el-input v-model="searchValue.name" size="mini" style="width: 130px"></el-input>
+          </el-col>
+          <el-col :span="6">
+            物资编号:
+            <el-input v-model="searchValue.number" size="mini" style="width: 130px"></el-input>
+          </el-col>
+          <el-col :span="6">
+            储存位置:
+            <el-input v-model="searchValue.store" size="mini" style="width: 130px"></el-input>
+          </el-col>
+          <el-col :span="6">
+            生产厂家:
+            <el-input v-model="searchValue.company" size="mini" style="width: 130px"></el-input>
+          </el-col>
+        </el-row>
+        <el-row style="margin-top: 10px">
+          <el-col :span="24" style="text-align: right">
+            <el-button size="mini" @click="showAdvanceSearchView = false">取消</el-button>
+            <el-button size="mini" icon="el-icon-search" type="primary" @click="initEmps('advanced')">搜索</el-button>
+          </el-col>
+        </el-row>
+      </div>
+    </transition>
+
     <table class="data-table">
       <thead>
         <tr>
@@ -24,19 +74,26 @@
         <tr v-for="(item, index) in paginatedData" :key="index">
           <td>{{ item.id }}</td>
           <td>{{ item.name }}</td>
-          <td>{{ item.spec }}</td>
+          <td>{{ item.scale }}</td>
           <td>{{ item.number }}</td>
-          <td>{{ item.manufacturer }}</td>
-          <td>{{ item.location }}</td>
-          <td class="quantity-cell">{{ item.quantity }}</td>
-          <td>{{ item.remark }}</td>
+          <td>{{ item.company }}</td>
+          <td>{{ item.store }}</td>
+          <td class="quantity-cell">{{ item.num }}</td>
+          <td>{{ item.etc }}</td>
         </tr>
       </tbody>
     </table>
-    <div class="pagination">
-      <button @click="prevPage" :disabled="currentPage === 1" class="page-button">上一页</button>
-      <span class="page-info">第 {{ currentPage }} 页，共 {{ totalPages }} 页</span>
-      <button @click="nextPage" :disabled="currentPage === totalPages" class="page-button">下一页</button>
+    <div style="display: flex;justify-content: flex-end;margin-top: 10px">
+      <el-pagination
+        background
+        @current-change="currentChange"
+        @size-change="sizeChange"
+        layout="sizes, prev, pager, next, jumper, ->, total, slot"
+        :total="total">
+      </el-pagination>
+    </div>
+    <div v-if="loading" class="loading-overlay">
+      <div class="loading-spinner"></div>
     </div>
   </div>
 </template>
@@ -46,132 +103,23 @@ export default {
   name: 'PtlEd',
   data() {
     return {
-      tableData: [
-        { 
-          id: '1',
-          name: '便携式可燃气体检测仪',
-          spec: 'XP-3140',
-          number: 'WZCL001',
-          manufacturer: '北京安全设备厂',
-          location: '应急仓库',
-          quantity: '5台',
-          remark: '正常'
-        },
-        { 
-          id: '2',
-          name: '正压式空气呼吸器',
-          spec: 'RHZK5/30',
-          number: 'WZCL002',
-          manufacturer: '济南消防器材厂',
-          location: '应急仓库',
-          quantity: '8套',
-          remark: '正常'
-        },
-        { 
-          id: '3',
-          name: '消防水带',
-          spec: 'DN65',
-          number: 'WZCL003',
-          manufacturer: '上海消防器材厂',
-          location: '应急仓库',
-          quantity: '20条',
-          remark: '完好'
-        },
-        { 
-          id: '4',
-          name: '便携式应急照明灯',
-          spec: 'LED-500W',
-          number: 'WZCL004',
-          manufacturer: '深圳照明设备厂',
-          location: '应急仓库',
-          quantity: '12个',
-          remark: '正常'
-        },
-        { 
-          id: '5',
-          name: '防毒面具',
-          spec: 'HG-87',
-          number: 'WZCL005',
-          manufacturer: '天津安全设备厂',
-          location: '应急仓库',
-          quantity: '15个',
-          remark: '完好'
-        },
-        { 
-          id: '6',
-          name: '消防栓扳手',
-          spec: 'CS-102',
-          number: 'WZCL006',
-          manufacturer: '重庆工具厂',
-          location: '消防柜',
-          quantity: '10把',
-          remark: '正常'
-        },
-        { 
-          id: '7',
-          name: '安全帽',
-          spec: 'ABS-01',
-          number: 'WZCL007',
-          manufacturer: '河北安全用品厂',
-          location: '应急仓库',
-          quantity: '25顶',
-          remark: '完好'
-        },
-        { 
-          id: '8',
-          name: '急救箱',
-          spec: 'JJ-2023',
-          number: 'WZCL008',
-          manufacturer: '广州医疗器械厂',
-          location: '值班室',
-          quantity: '3个',
-          remark: '正常'
-        },
-        { 
-          id: '9',
-          name: '便携式氧气检测仪',
-          spec: 'CY-7B',
-          number: 'WZCL009',
-          manufacturer: '武汉仪器厂',
-          location: '应急仓库',
-          quantity: '4台',
-          remark: '完好'
-        },
-        { 
-          id: '10',
-          name: '消防斧',
-          spec: 'XF-25',
-          number: 'WZCL010',
-          manufacturer: '长沙工具厂',
-          location: '消防柜',
-          quantity: '6把',
-          remark: '正常'
-        },
-        { 
-          id: '11',
-          name: '防爆对讲机',
-          spec: 'FB-868',
-          number: 'WZCL011',
-          manufacturer: '南京通信设备厂',
-          location: '值班室',
-          quantity: '10台',
-          remark: '完好'
-        },
-        { 
-          id: '12',
-          name: '便携式发电机',
-          spec: 'FD-5000W',
-          number: 'WZCL012',
-          manufacturer: '杭州机械厂',
-          location: '应急仓库',
-          quantity: '2台',
-          remark: '正常'
-        }
-      ],
+      tableData: [], // 清空初始数据，改为从后端获取
       searchQuery: '',
       currentPage: 1,
       itemsPerPage: 10,
       filteredDataCache: [],
+      loading: false, // 添加加载状态标志
+      total: 0,
+      page: 1,
+      size: 10,
+      keyword: '',
+      showAdvanceSearchView: false,
+      searchValue: {
+        name: '',
+        number: '',
+        store: '',
+        company: ''
+      }
     };
   },
   computed: {
@@ -185,19 +133,75 @@ export default {
     },
   },
   methods: {
-    performSearch() {
-      const query = this.searchQuery.trim().toLowerCase();
-      if (!query) {
-        this.filteredDataCache = this.tableData;
-      } else {
-        this.filteredDataCache = this.tableData.filter(item => {
-          return Object.values(item).some(value =>
-            String(value).toLowerCase().includes(query)
-          );
-        });
+    async fetchData() {
+      this.loading = true;
+      try {
+        const response = await this.$axios.get('/ptl/ed');
+        if (response.status === 200) {
+          this.tableData = response.data;
+          this.filteredDataCache = this.tableData;
+        }
+      } catch (error) {
+        console.error('获取物资清单失败:', error);
+        this.$message.error('获取物资清单失败');
+      } finally {
+        this.loading = false;
       }
-      this.currentPage = 1;
     },
+
+    async performSearch() {
+      this.page = 1;
+      this.keyword = this.searchQuery;
+      await this.initEmps();
+    },
+
+    async initEmps(type) {
+      this.loading = true;
+      let url = '/ptl/ed?page=' + this.page + '&size=' + this.size;  // 去掉多余的斜杠
+      
+      if (type && type == 'advanced') {
+        // 添加高级搜索参数
+        if (this.searchValue.name) {
+          url += '&name=' + this.searchValue.name;
+        }
+        if (this.searchValue.number) {
+          url += '&number=' + this.searchValue.number;
+        }
+        if (this.searchValue.store) {
+          url += '&store=' + this.searchValue.store;
+        }
+        if (this.searchValue.company) {
+          url += '&company=' + this.searchValue.company;
+        }
+      } else {
+        url += "&keyword=" + this.keyword;
+      }
+
+      try {
+        const response = await this.getRequest(url);
+        if (response) {
+          this.tableData = response.data;
+          this.total = response.total;
+          this.filteredDataCache = this.tableData;
+        }
+      } catch (error) {
+        console.error('获取物资清单失败:', error);
+        this.$message.error('获取物资清单失败');
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    sizeChange(currentSize) {
+      this.size = currentSize;
+      this.initEmps();
+    },
+
+    currentChange(currentPage) {
+      this.page = currentPage;
+      this.initEmps();
+    },
+
     nextPage() {
       if (this.currentPage < this.totalPages) {
         this.currentPage++;
@@ -210,8 +214,8 @@ export default {
     },
   },
   mounted() {
-    this.filteredDataCache = this.tableData;
-  },
+    this.initEmps(); // 组件挂载时获取数据
+  }
 };
 </script>
 
@@ -328,4 +332,44 @@ tr:hover {
   font-weight: bold;
 }
 
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 5px solid #f3f3f3;
+  border-top: 5px solid #3498db;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 添加过渡动画样式 */
+.slide-fade-enter-active {
+  transition: all .8s ease;
+}
+
+.slide-fade-leave-active {
+  transition: all .8s cubic-bezier(1.0, 0.5, 0.8, 1.0);
+}
+
+.slide-fade-enter, .slide-fade-leave-to {
+  transform: translateX(10px);
+  opacity: 0;
+}
 </style>

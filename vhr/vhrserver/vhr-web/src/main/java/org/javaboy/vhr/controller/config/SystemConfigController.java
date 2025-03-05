@@ -1,5 +1,6 @@
 package org.javaboy.vhr.controller.config;
 
+import org.javaboy.vhr.model.EmrData;
 import org.javaboy.vhr.model.Menu;
 import org.javaboy.vhr.model.RespBean;
 import org.javaboy.vhr.service.MenuService;

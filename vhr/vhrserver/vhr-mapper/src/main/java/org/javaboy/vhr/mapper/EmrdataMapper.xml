@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="org.javaboy.vhr.mapper.EmrdataMapper">
+    <resultMap id="BaseResultMap" type="org.javaboy.vhr.model.EmrData">
+        <id column="id" property="id" jdbcType="INTEGER"/>
+        <result column="name" property="name" jdbcType="VARCHAR"/>
+        <result column="scale" property="scale" jdbcType="VARCHAR"/>
+        <result column="number" property="number" jdbcType="VARCHAR"/>
+        <result column="company" property="company" jdbcType="VARCHAR"/>
+        <result column="store" property="store" jdbcType="VARCHAR"/>
+        <result column="num" property="num" jdbcType="VARCHAR"/>
+        <result column="etc" property="etc" jdbcType="VARCHAR"/>
+    </resultMap>
+    <sql id="Base_Column_List">
+        id, name, scale, number, company, store, num, etc
+    </sql>
+    <select id="getAllEmrdata" resultMap="BaseResultMap">
+        select
+        <include refid="Base_Column_List"/>
+        from salary
+    </select>
+    <select id="selectByPrimaryKey" resultMap="BaseResultMap" parameterType="java.lang.Integer">
+        select
+        <include refid="Base_Column_List"/>
+        from emrdata
+        where id = #{id,jdbcType=INTEGER}
+    </select>
+    <delete id="deleteByPrimaryKey" parameterType="java.lang.Integer">
+        delete from emrdata
+        where id = #{id,jdbcType=INTEGER}
+    </delete>
+    <insert id="insert" parameterType="org.javaboy.vhr.model.EmrData">
+        insert into emrdata (id, name, scale, number, company, store, num, etc)
+        values (#{id,jdbcType=INTEGER}, #{name,jdbcType=VARCHAR}, #{scale,jdbcType=VARCHAR},
+        #{number,jdbcType=VARCHAR}, #{company,jdbcType=VARCHAR}, #{store,jdbcType=VARCHAR},
+        #{num,jdbcType=VARCHAR}, #{etc,jdbcType=VARCHAR})
+    </insert>
+    <insert id="insertSelective" parameterType="org.javaboy.vhr.model.EmrData">
+        insert into emrdata
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">
+                id,
+            </if>
+            <if test="name != null">
+                name,
+            </if>
+            <if test="scale != null">
+                scale,
+            </if>
+            <if test="number != null">
+                number,
+            </if>
+            <if test="company != null">
+                company,
+            </if>
+            <if test="store != null">
+                store,
+            </if>
+            <if test="num != null">
+                num,
+            </if>
+            <if test="etc != null">
+                etc,
+            </if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">
+                #{id,jdbcType=INTEGER},
+            </if>
+            <if test="name != null">
+                #{name,jdbcType=VARCHAR},
+            </if>
+            <if test="scale != null">
+                #{scale,jdbcType=VARCHAR},
+            </if>
+            <if test="number != null">
+                #{number,jdbcType=VARCHAR},
+            </if>
+            <if test="company != null">
+                #{company,jdbcType=VARCHAR},
+            </if>
+            <if test="store != null">
+                #{store,jdbcType=VARCHAR},
+            </if>
+            <if test="num != null">
+                #{num,jdbcType=VARCHAR},
+            </if>
+            <if test="etc != null">
+                #{etc,jdbcType=VARCHAR},
+            </if>
+        </trim>
+    </insert>
+    <update id="updateByPrimaryKeySelective" parameterType="org.javaboy.vhr.model.EmrData">
+        update emrdata
+        <set>
+            <if test="name != null">
+                name = #{name,jdbcType=VARCHAR},
+            </if>
+            <if test="scale != null">
+                scale = #{scale,jdbcType=VARCHAR},
+            </if>
+            <if test="number != null">
+                number = #{number,jdbcType=VARCHAR},
+            </if>
+            <if test="company != null">
+                company = #{company,jdbcType=VARCHAR},
+            </if>
+            <if test="store != null">
+                store = #{store,jdbcType=VARCHAR},
+            </if>
+            <if test="num != null">
+                num = #{num,jdbcType=VARCHAR},
+            </if>
+            <if test="etc != null">
+                etc = #{etc,jdbcType=VARCHAR},
+            </if>
+        </set>
+        where id = #{id,jdbcType=INTEGER}
+    </update>
+    <update id="updateByPrimaryKey" parameterType="org.javaboy.vhr.model.EmrData">
+        update emrdata
+        set
+        name = #{name,jdbcType=VARCHAR},
+        scale = #{scale,jdbcType=VARCHAR},
+        number = #{number,jdbcType=VARCHAR},
+        company = #{company,jdbcType=VARCHAR},
+        store = #{store,jdbcType=VARCHAR},
+        num = #{num,jdbcType=VARCHAR},
+        etc = #{etc,jdbcType=VARCHAR}
+        where id = #{id,jdbcType=INTEGER}
+    </update>
+    <select id="getEmrdataByPage" resultMap="BaseResultMap">
+        select
+        <include refid="Base_Column_List"/>
+        from emrdata
+        <where>
+            <if test="keyword != null and keyword != ''">
+                and (name like concat('%',#{keyword},'%')
+                or number like concat('%',#{keyword},'%')
+                or store like concat('%',#{keyword},'%')
+                or company like concat('%',#{keyword},'%'))
+            </if>
+            <if test="name != null and name != ''">
+                and name like concat('%',#{name},'%')
+            </if>
+            <if test="number != null and number != ''">
+                and number like concat('%',#{number},'%')
+            </if>
+            <if test="store != null and store != ''">
+                and store like concat('%',#{store},'%')
+            </if>
+            <if test="company != null and company != ''">
+                and company like concat('%',#{company},'%')
+            </if>
+        </where>
+        <if test="page != null and size != null">
+            limit #{page},#{size}
+        </if>
+    </select>
+
+    <select id="getTotal" resultType="java.lang.Long">
+        select count(*) from emrdata
+        <where>
+            <if test="keyword != null and keyword != ''">
+                and (name like concat('%',#{keyword},'%')
+                or number like concat('%',#{keyword},'%')
+                or store like concat('%',#{keyword},'%')
+                or company like concat('%',#{keyword},'%'))
+            </if>
+            <if test="name != null and name != ''">
+                and name like concat('%',#{name},'%')
+            </if>
+            <if test="number != null and number != ''">
+                and number like concat('%',#{number},'%')
+            </if>
+            <if test="store != null and store != ''">
+                and store like concat('%',#{store},'%')
+            </if>
+            <if test="company != null and company != ''">
+                and company like concat('%',#{company},'%')
+            </if>
+        </where>
+    </select>
+</mapper>
