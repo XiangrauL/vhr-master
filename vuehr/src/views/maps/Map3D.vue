@@ -154,7 +154,37 @@ export default {
       // 实现绘制面功能
     },
     addMarker() {
-      // 实现添加地标功能
+      const markerClickHandler = (e) => {
+        const coordinates = e.lngLat;
+        // 创建一个新的标记
+        const marker = new mapboxgl.Marker({
+          color: "#FF0000",
+          draggable: true
+        })
+          .setLngLat(coordinates)
+          .addTo(this.map);
+
+        // 创建弹出框
+        const popup = new mapboxgl.Popup({
+          offset: 25,
+          closeButton: true,
+          closeOnClick: true
+        })
+          .setHTML(`
+            <h3>新标记</h3>
+            <p>经度: ${coordinates.lng.toFixed(4)}</p>
+            <p>纬度: ${coordinates.lat.toFixed(4)}</p>
+          `);
+
+        // 将弹出框绑定到标记
+        marker.setPopup(popup);
+
+        // 移除点击事件监听器
+        this.map.off('click', markerClickHandler);
+      };
+
+      // 添加点击事件监听器
+      this.map.once('click', markerClickHandler);
     },
     clearDrawings() {
       // 实现清空标绘功能
