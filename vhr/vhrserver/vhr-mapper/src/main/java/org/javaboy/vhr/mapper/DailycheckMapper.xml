@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="org.javaboy.vhr.mapper.DailycheckMapper">
+    <!-- 基础结果映射 -->
+    <resultMap id="BaseResultMap" type="org.javaboy.vhr.model.DailyCheck">
+        <id column="id" property="id" jdbcType="INTEGER"/>
+        <result column="name" property="name" jdbcType="VARCHAR"/>
+        <result column="problem" property="problem" jdbcType="VARCHAR"/>
+        <result column="createDate" property="createDate" jdbcType="TIMESTAMP"/>
+    </resultMap>
+    
+    <!-- 基础字段列表 -->
+    <sql id="Base_Column_List">
+        id, name, problem, createDate
+    </sql>
+    
+    <!-- 插入完整的故障记录 -->
+    <insert id="insert" parameterType="org.javaboy.vhr.model.DailyCheck">
+        insert into dailycheck (id, name, problem, createDate)
+        values (#{id,jdbcType=INTEGER}, #{name,jdbcType=VARCHAR},
+         #{problem,jdbcType=VARCHAR},#{createDate,jdbcType=TIMESTAMP})
+    </insert>
+    
+    <!-- 选择性插入故障记录（只插入非空字段） -->
+    <insert id="insertSelective" parameterType="org.javaboy.vhr.model.DailyCheck">
+        insert into dailycheck
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null">
+                id,
+            </if>
+            <if test="name != null">
+                name,
+            </if>
+            <if test="problem != null">
+                problem,
+            </if>
+            <if test="createDate != null">
+                createDate,
+            </if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null">
+                #{id,jdbcType=INTEGER},
+            </if>
+            <if test="name != null">
+                #{name,jdbcType=VARCHAR},
+            </if>
+            <if test="problem != null">
+                #{problem,jdbcType=VARCHAR},
+            </if>
+            <if test="createDate != null">
+                #{createDate,jdbcType=TIMESTAMP},
+            </if>
+        </trim>
+    </insert>
+</mapper>
